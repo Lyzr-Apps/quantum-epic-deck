@@ -98,10 +98,30 @@ function ChatWidget() {
       const data = await response.json()
 
       if (data.success) {
-        // Extract agent response
-        const agentResponse = data.response?.response || data.response || 'Unable to process your request'
-        const sources = data.response?.sources || []
-        const status = data.response?.status || 'answered'
+        // Extract agent response - handle both string and object responses
+        let agentResponse = 'Unable to process your request'
+        let sources: Array<{ page_title: string; url: string; relevance: number }> = []
+        let status = 'answered'
+
+        // If response is an object with nested properties
+        if (typeof data.response === 'object' && data.response !== null) {
+          // Check for various possible response formats
+          if (typeof data.response.response === 'string') {
+            agentResponse = data.response.response
+          } else if (typeof data.response.message === 'string') {
+            agentResponse = data.response.message
+          } else if (typeof data.response.text === 'string') {
+            agentResponse = data.response.text
+          } else if (typeof data.response.result === 'string') {
+            agentResponse = data.response.result
+          }
+
+          sources = data.response.sources || []
+          status = data.response.status || 'answered'
+        } else if (typeof data.response === 'string') {
+          // If response is already a string
+          agentResponse = data.response
+        }
 
         // Determine if escalated
         const isEscalated = status === 'escalated'
@@ -111,7 +131,7 @@ function ChatWidget() {
           type: isEscalated ? 'system' : 'agent',
           content: isEscalated
             ? "I don't have enough information to answer this accurately. I've escalated your query to our support team at vidur@lyzr.ai. You'll receive a response within 24 hours."
-            : agentResponse,
+            : String(agentResponse),
           timestamp: new Date(),
           sources: sources.length > 0 ? sources : undefined,
           escalated: isEscalated,
